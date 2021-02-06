@@ -105,3 +105,5 @@ dist
 
 *.js
 *.d.ts
+
+config.json

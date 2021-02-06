@@ -17,7 +17,9 @@
 		"url": "https://github.com/samualtnorman/typescript-project/issues"
 	},
 	"homepage": "https://github.com/samualtnorman/typescript-project#readme",
-	"dependencies": {},
+	"dependencies": {
+		"@samual/hackmud-chat-api": "0.1.0-40fce2a"
+	},
 	"devDependencies": {
 		"@types/node": "^14.14.25",
 		"typescript": "^4.1.3"
