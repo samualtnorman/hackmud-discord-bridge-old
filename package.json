@@ -18,7 +18,8 @@
 	},
 	"homepage": "https://github.com/samualtnorman/typescript-project#readme",
 	"dependencies": {
-		"@samual/hackmud-chat-api": "0.1.0-40fce2a"
+		"@samual/hackmud-chat-api": "0.1.0-8c5bb8c",
+		"discord.js": "^12.5.1"
 	},
 	"devDependencies": {
 		"@types/node": "^14.14.25",

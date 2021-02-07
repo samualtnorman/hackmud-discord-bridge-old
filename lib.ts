@@ -51,3 +51,20 @@ export function validate<T extends ValidReference>(target: any, validRef: T): ta
 
 	return typeof target == validRef
 }
+
+export class DynamicMap<K, V> extends Map<K, V> {
+	constructor(private fallbackHandler: (key: K) => V) { super() }
+
+	get(key: K) {
+		let value = super.get(key)
+
+		if (value)
+			return value
+
+		value = this.fallbackHandler(key)
+
+		this.set(key, value)
+
+		return value
+	}
+}
