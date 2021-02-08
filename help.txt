@@ -1,0 +1,6 @@
+commands:
+ping
+emergency-stop
+add-role <role> to <user>
+tell <user> <message>
+users
