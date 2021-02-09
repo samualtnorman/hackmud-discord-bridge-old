@@ -3,14 +3,32 @@ import { readFile, writeFile } from "fs/promises"
 import { validate, DynamicMap, asyncReplace } from "./lib"
 import { Client as DiscordClient, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
 
+// const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
+
 readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config => {
 	if (validate(config, {
-		hosts: [ "string" ],
+		host: [ "string" ],
+		chatbot: [ "string" ],
 		hackmudToken: "string",
 		discordToken: "string",
 		roles: {},
-		colors: {}
+		colors: {},
+		adverts: [ "string" ]
 	})) {
+		let hosts: string[]
+
+		if (typeof config.host == "string")
+			hosts = [ config.host ]
+		else
+			hosts = config.host
+
+		let chatbots: string[]
+
+		if (typeof config.chatbot == "string")
+			chatbots = [ config.chatbot ]
+		else
+			chatbots = config.chatbot
+
 		const processDiscordMessage = async (message: DiscordMessage, users: Map<string, string[]>) => {
 			if (message.author != discordAPI.user && message.channel.type == "text") {
 				let commandResponse: string | undefined
@@ -25,35 +43,40 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 				let host: string | undefined
 
-				for (const user of config.hosts) {
+				for (const user of hosts) {
 					if (users.get(user)?.includes(channel)) {
 						host = user
 						break
 					}
 				}
 
+
 				if (host) {
-					const colours = "ABCDEFGHIJKLMNOPQSTUVWXYbcdefghijklmnopqstuvwxy"
-					const id      = message.author.toString()
-					const userColours = config.colors as Record<string, string>
-
-					if (!userColours[id])
-						userColours[id] = `${colours[Math.floor(Math.random() * colours.length)]}${colours[Math.floor(Math.random() * colours.length)]}`
-
 					const promise = hackmudChatAPI.sendMessage(
 						host,
 						channel,
-						" " + stringifyDiscordUser(message.author, true) + (await asyncReplace(
-							message.content.replace(`<@!${discordAPI.user!.id}> `, ""),
+						renderColour(` ${stringifyDiscordUser(message.author, true)}${await asyncReplace(
+							message.content.replaceAll("[", "\\[").replaceAll("]", "\\]").replaceAll("`", "«"),
 							/<@!?(\d+)>/g,
-							async (_, user) => "test"
-						)) + "` ")
+							async (_, id) => stringifyDiscordUser(await discordAPI.users.fetch(id))
+						)} `)
+					)
 
-					if (commandResponse)
+					if (commandResponse) {
+						let chatbot: string | undefined
+
+						for (const user of chatbots) {
+							if (users.get(user)?.includes(channel)) {
+								chatbot = user
+								break
+							}
+						}
+
 						// TODO mention user
-						promise.then(() => hackmudChatAPI.sendMessage(host!, channel, commandResponse!))
+						promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, commandResponse!))
+					}
 				} else {
-					message.react("❌")
+					message.react("\u274C")
 					discordChannels.get("test")?.send(`<@${guild!.ownerID}> missing host in channel **${channel}**`)
 				}
 			}
@@ -65,7 +88,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			for (const message of messages) {
 				if (message.type == HackmudMessageType.Tell)
 					discordChannels.get("test")?.send(`<@${guild!.ownerID}> to ${message.toUser}\n${processHackmudMessageText(message)}`)
-				else if (config.hosts.includes(message.user))
+				else if (hosts.includes(message.user) || chatbots.includes(message.user))
 					discordChannels.get("test")?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 				else
 					channelMessages.get(message.channel).push(message)
@@ -134,18 +157,21 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					return `added @${user} to ${role} role`
 
 				case "tell":
-					if (!config.hosts || !config.hosts[0])
+					if (!hosts.length)
 						return "tell command not available"
 
 					if (author instanceof DiscordUser) {
 						try {
-							await hackmudChatAPI.tellMessage(Array.isArray(config.hosts) ? config.hosts[0] : config.hosts, args[0], " " + stringifyDiscordUser(author, true) + args.slice(1).join(" ") + "` ")
+							await hackmudChatAPI.tellMessage(
+								hosts[0], args[0],
+								renderColour(` ${stringifyDiscordUser(author, true)}${args.slice(1).join(" ").replaceAll("[", "\\[").replaceAll("]", "\\]")} `).replaceAll("`", "«")
+							)
 						} catch (error) {
 							return error.message
 						}
 					} else {
 						try {
-							await hackmudChatAPI.tellMessage(Array.isArray(config.hosts) ? config.hosts[0] : config.hosts, args[0], " @" + author + ": " + args.slice(1).join(" ") + " ")
+							await hackmudChatAPI.tellMessage(hosts[0], args[0], " @" + author + ": " + args.slice(1).join(" ") + " ")
 						} catch (error) {
 							return error.message
 						}
@@ -168,8 +194,6 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 		}
 
 		const stringifyDiscordUser = (user: DiscordUser, messagePre = false) => {
-			console.log(user)
-
 			const colours = "ABCDEFGHIJKLMNOPQSTUVWXYbcdefghijklmnopqstuvwxy"
 			const id = user.toString()
 			const userColours = config.colors as Record<string, string>
@@ -181,9 +205,9 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			}
 
 			if (messagePre)
-				return "`" + userColours[id][0] + user.username + "``c#``C" + user.discriminator + "`: `" + userColours[id][1]
+				return `[${userColours[id][0]}${user.username}][c#][C${user.discriminator}]: [${userColours[id][1]}`
 
-			return "`" + userColours[id][0] + user.username + "``c#``C" + user.discriminator + "`"
+			return `[${userColours[id][0]}${user.username}][c#][C${user.discriminator}]`
 		}
 
 		const hackmudChatAPI = new HackmudChatAPI(config.hackmudToken)
@@ -199,6 +223,44 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					preDiscordReadyMessageBuffer.push(...messages)
 			})
 
+		const reloadConfigLoop = () => {
+			// setTimeout(async () => {
+			// 	let configTemp = JSON.parse(await readFile("./config.json", { encoding: "utf-8" }))
+
+			// 	if (validate(config, {
+			// 		hosts: [ "string" ],
+			// 		hackmudToken: "string",
+			// 		discordToken: "string",
+			// 		roles: {},
+			// 		colors: {},
+			// 		adverts: [ "string" ]
+			// 	}))
+			// 		config = configTemp
+
+			// 	reloadConfigLoop()
+			// }, 5000)
+		}
+
+		const advertLoop = () => {
+			setTimeout(() => {
+				if (config.adverts.length) {
+					let chatbot: string | undefined
+
+					for (const user of chatbots) {
+						if (users!.get(user)?.includes("0000")) {
+							chatbot = user
+							break
+						}
+					}
+
+					if (chatbot)
+						hackmudChatAPI.sendMessage(chatbot, "0000", config.adverts[Math.floor(Math.random() * config.adverts.length)])
+				}
+
+				advertLoop()
+			}, Math.floor(Math.random() * 3600000))
+		}
+
 		let users: Map<string, string[]> | null = null
 		const preGetChannelsMessageBuffer: DiscordMessage[] = []
 
@@ -207,14 +269,17 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 			for (const message of preGetChannelsMessageBuffer)
 				processDiscordMessage(message, users)
+
+			reloadConfigLoop()
+			advertLoop()
 		})
 
 		const discordChannels = new Map<string, DiscordTextChannel>()
 		let guild: Guild | null = null
 		const preDiscordReadyMessageBuffer: (HackmudChannelMessage | HackmudTellMessage)[] = []
 
-		const discordAPI = new DiscordClient()
-			.on("ready", () => {
+		const discordAPI = new DiscordClient({ retryLimit: 4 })
+			.on("ready", async () => {
 				[ guild ] = discordAPI.guilds.cache.array()
 
 				for (const channel of guild.channels.cache.array()) {
@@ -237,3 +302,71 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 	} else
 		console.log("invalid config")
 })
+
+function renderColour(text: string) {
+	const data = text.split("")
+	const colourStack: string[] = []
+	let o = ""
+	let unopened = false
+
+	while (data.length) {
+		const char = data.shift()
+
+		switch (char) {
+			case "[": {
+				const nextChar = data.shift()
+
+				if (nextChar?.match(/[a-zA-Z0-9]/)) {
+					if (colourStack.length && !unopened)
+						o += "`"
+
+					unopened = true
+
+					colourStack.push(nextChar)
+				} else
+					o += "`" + (nextChar || "")
+			} break
+
+			case "]":
+				if (!colourStack.length)
+					o += "]"
+				else {
+					if (!unopened)
+						o += "`"
+
+					colourStack.pop()
+
+					unopened = true
+				}
+
+				break
+
+			case " ":
+				o += " "
+				break
+
+			case "\\":
+				if (unopened && colourStack.length) {
+					o += "`" + colourStack[colourStack.length - 1]
+					unopened = false
+				}
+
+				o += data.shift()
+
+				break
+
+			default:
+				if (unopened && colourStack.length) {
+					o += "`" + colourStack[colourStack.length - 1]
+					unopened = false
+				}
+
+				o += char
+		}
+	}
+
+	if (colourStack.length && !unopened)
+		o += "`"
+
+	return o
+}
