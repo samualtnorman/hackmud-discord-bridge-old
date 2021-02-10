@@ -64,7 +64,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 							host,
 							channel,
 							renderColour(` ${stringifyDiscordUser(message.author, true)}${await asyncReplace(
-								message.content.replaceAll("[", "\\[").replaceAll("]", "\\]").replaceAll("`", "«"),
+								message.content.replaceAll("[", "\\[").replaceAll("]", "\\]").replaceAll("`", "«").replaceAll("\\", "\\\\"),
 								/<@!?(\d+)>/g,
 								async (_, id) => stringifyDiscordUser(await discordAPI.users.fetch(id))
 							)} `)
@@ -177,7 +177,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 						try {
 							await hackmudChatAPI.tellMessage(
 								hosts[0], args[0],
-								renderColour(` ${stringifyDiscordUser(author, true)}${args.slice(1).join(" ").replaceAll("[", "\\[").replaceAll("]", "\\]")} `).replaceAll("`", "«")
+								renderColour(` ${stringifyDiscordUser(author, true)}${args.slice(1).join(" ").replaceAll("[", "\\[").replaceAll("]", "\\]")} `).replaceAll("`", "«").replaceAll("\\", "\\\\")
 							)
 						} catch (error) {
 							return error.message
@@ -283,6 +283,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			for (const message of preGetChannelsMessageBuffer)
 				processDiscordMessage(message, users)
 
+			preGetChannelsMessageBuffer.length = 0
+
 			reloadConfigLoop()
 			advertLoop()
 		})
@@ -301,6 +303,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				}
 
 				processHackmudMessages(preDiscordReadyMessageBuffer)
+				preDiscordReadyMessageBuffer.length = 0
 			})
 			.on("message", message => {
 				// TODO process messages as much as we can before sending them to the buffer
