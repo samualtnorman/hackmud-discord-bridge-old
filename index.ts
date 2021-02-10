@@ -96,7 +96,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 			for (const message of messages) {
 				if (message.type == HackmudMessageType.Tell)
-					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}> to ${message.toUser}\n${processHackmudMessageText(message)}`)
+					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}>, tell from **${message.user}** to **${message.toUser}**${processHackmudMessageText(message, false)}`)
 				else if (hosts.includes(message.user) || chatbots.includes(message.user))
 					discordChannels.get(config.adminChannel)?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 				else
@@ -131,18 +131,22 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			}
 		}
 
-		const processHackmudMessageText = ({ user, content }: HackmudChannelMessage | HackmudTellMessage) => {
-			let o = `**${user}**`
+		const processHackmudMessageText = ({ user, content }: HackmudChannelMessage | HackmudTellMessage, head = true) => {
+			let o = ""
 
-			const roles: string[] = []
+			if (head) {
+				o += `**${user}**`
 
-			for (const [ role, users ] of Object.entries(config.roles as Record<string, string[]>)) {
-				if (users.includes(user))
-					roles.push(role)
+				const roles: string[] = []
+
+				for (const [ role, users ] of Object.entries(config.roles as Record<string, string[]>)) {
+					if (users.includes(user))
+						roles.push(role)
+				}
+
+				if (roles.length)
+					o += ` [${roles.join(", ")}]`
 			}
-
-			if (roles.length)
-				o += ` [${roles.join(", ")}]`
 
 			return o + ":```\n" + content.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, (_, match) => match).replace(/`/g, "`\u200B") + "```"
 		}
