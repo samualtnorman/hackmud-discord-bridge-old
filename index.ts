@@ -193,6 +193,29 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					return ""
 
 				case "users":
+					if (channel == config.adminChannel) {
+						let o = "users:\n"
+						const usersNotInChannel: string[] = []
+
+						for (const [ user, channels ] of (await hackmudChatAPI.getChannels())) {
+							if (channels.length)
+								o += `**${user}**:\n${channels.map(channel => {
+									let o = `\t- ${channel}`
+
+									const discordChannel = discordChannels.get(channel)
+
+									if (discordChannel)
+										o += ` ${discordChannel}`
+
+									return o
+								}).join("\n")}\n\n`
+							else
+								usersNotInChannel.push(`**${user}**`)
+						}
+
+						return `${o}\nnot in channel: ${usersNotInChannel.join(", ")}`
+					}
+
 					if (channel)
 						return (await hackmudChatAPI.getChannels(true)).channels.get(channel)!.join(", ")
 
