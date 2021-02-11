@@ -42,6 +42,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				let commandResponse: string | undefined
 				const channel = message.channel.topic || message.channel.name
 
+				channelsLastUser.delete(channel)
+
 				if (message.content.startsWith(`<@!${discordAPI.user!.id}>`)) {
 					commandResponse = await processCommand(message.content.replace(`<@!${discordAPI.user!.id}> `, ""), message.author, channel)
 
@@ -96,14 +98,14 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 			for (const message of messages) {
 				if (message.type == HackmudMessageType.Tell)
-					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**${processHackmudMessageText(message, false)}`)
+					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 				else if (hosts.includes(message.user) || chatbots.includes(message.user))
 					discordChannels.get(config.adminChannel)?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 				else
 					channelMessages.get(message.channel).push(message)
 			}
 
-			for (const [ channelName, messages ] of channelMessages) {
+			for (const [ channel, messages ] of channelMessages) {
 				let toSend = ""
 
 				for (const message of messages) {
@@ -117,17 +119,19 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 							break
 
 						case MessageType.Send:
-							toSend += processHackmudMessageText(message)
+							toSend += processHackmudMessageText(message, channelsLastUser.get(channel) != message.user)
 							break
 					}
+
+					channelsLastUser.set(channel, message.user)
 				}
 
-				let discordChannel = discordChannels.get(channelName)
+				let discordChannel = discordChannels.get(channel)
 
 				if (discordChannel)
 					discordChannel.send(toSend)
 				else
-					discordChannels.get(config.adminChannel)?.send(`channel **${channelName}**...\n${toSend}`)
+					discordChannels.get(config.adminChannel)?.send(`channel **${channel}**...\n${toSend}`)
 			}
 		}
 
@@ -146,9 +150,11 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 				if (roles.length)
 					o += ` [${roles.join(", ")}]`
+
+				o += ":"
 			}
 
-			return o + ":```\n" + content.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, (_, match) => match).replace(/`/g, "`\u200B") + "```"
+			return o + "```\n" + content.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, (_, match) => match).replace(/`/g, "`\u200B") + "```"
 		}
 
 
@@ -315,6 +321,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 		const discordChannels = new Map<string, DiscordTextChannel>()
 		let guild: Guild | null = null
 		const preDiscordReadyMessageBuffer: (HackmudChannelMessage | HackmudTellMessage)[] = []
+
+		const channelsLastUser = new Map<string, string>()
 
 		const discordAPI = new DiscordClient({ retryLimit: 4 })
 			.on("ready", async () => {
