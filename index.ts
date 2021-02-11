@@ -184,6 +184,9 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				o += ":"
 			}
 
+			if (content.split("\n").length == 1)
+				content = content.trim()
+
 			return o + "```\n" + content.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, (_, match) => match).replace(/`/g, "`\u200B") + "```"
 		}
 
