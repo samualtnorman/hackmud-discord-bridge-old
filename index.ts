@@ -257,6 +257,15 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 					return "what do you mean?"
 
+				case "add-advert":
+					const advert = args.join(" ")
+
+					adverts.push(advert)
+					config.advert = adverts
+					writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
+
+					return "added:```\n" + advert + "```"
+
 				case "help":
 					return readFile("./help.txt", { encoding: "utf-8" })
 
