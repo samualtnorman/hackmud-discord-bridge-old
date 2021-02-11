@@ -334,8 +334,13 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 						}
 					}
 
-					if (chatbot)
-						hackmudChatAPI.sendMessage(chatbot, "0000", adverts[Math.floor(Math.random() * adverts.length)])
+					if (chatbot) {
+						const advert = adverts[Math.floor(Math.random() * adverts.length)]
+
+						hackmudChatAPI.sendMessage(chatbot, "0000", advert)
+						discordChannels.get("0000")?.send(processHackmudMessageText({ user: chatbot, content: advert }))
+						channelsLastUser.delete("0000")
+					}
 				}
 
 				advertLoop()
