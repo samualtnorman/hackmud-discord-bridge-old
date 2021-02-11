@@ -93,7 +93,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			}
 		}
 
-		const processHackmudMessages = (messages: (HackmudChannelMessage | HackmudTellMessage)[]) => {
+		const processHackmudMessages = async (messages: (HackmudChannelMessage | HackmudTellMessage)[]) => {
 			const channelMessages = new DynamicMap<string, HackmudChannelMessage[]>(() => [] as HackmudChannelMessage[])
 
 			for (const message of messages) {
@@ -112,18 +112,49 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					switch (message.type) {
 						case MessageType.Join:
 							toSend += `**${message.user.replaceAll("_", "\\_")}** joined channel\n`
+
+							channelsLastUser.set(channel, message.user)
+
 							break
 
 						case MessageType.Leave:
 							toSend += `**${message.user.replaceAll("_", "\\_")}** left channel\n`
+
+							channelsLastUser.set(channel, message.user)
+
 							break
 
 						case MessageType.Send:
 							toSend += processHackmudMessageText(message, channelsLastUser.get(channel) != message.user)
+
+							channelsLastUser.set(channel, message.user)
+
+							if (chatbots.includes(message.content.trim().slice(1).split(" ")[0])) {
+								let commandResponse = await processCommand(message.content.trim().split(" ").slice(1).join(" "), message.user, channel)
+
+								if (commandResponse) {
+									let chatbot: string | undefined
+
+									for (const user of chatbots) {
+										if (users!.get(user)?.includes(channel)) {
+											chatbot = user
+											break
+										}
+									}
+
+									commandResponse = `@${message.user}, ${commandResponse}`
+
+									toSend += `\n${commandResponse}\n`
+
+									if (chatbot)
+										hackmudChatAPI.sendMessage(chatbot, channel, commandResponse)
+
+									channelsLastUser.delete(channel)
+								}
+							}
+
 							break
 					}
-
-					channelsLastUser.set(channel, message.user)
 				}
 
 				let discordChannel = discordChannels.get(channel)
@@ -135,7 +166,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			}
 		}
 
-		const processHackmudMessageText = ({ user, content }: HackmudChannelMessage | HackmudTellMessage, head = true) => {
+		const processHackmudMessageText = ({ user, content }: { user: string, content: string }, head = true) => {
 			let o = ""
 
 			if (head) {
