@@ -294,7 +294,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				}
 
 				advertLoop()
-			}, Math.floor(Math.random() * 7200000))
+			}, Math.floor(Math.random() * 3600000) + 1800000)
 		}
 
 		let users: Map<string, string[]> | null = null
