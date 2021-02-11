@@ -96,7 +96,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 			for (const message of messages) {
 				if (message.type == HackmudMessageType.Tell)
-					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}>, tell from **${message.user}** to **${message.toUser}**${processHackmudMessageText(message, false)}`)
+					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**${processHackmudMessageText(message, false)}`)
 				else if (hosts.includes(message.user) || chatbots.includes(message.user))
 					discordChannels.get(config.adminChannel)?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 				else
@@ -109,11 +109,11 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				for (const message of messages) {
 					switch (message.type) {
 						case MessageType.Join:
-							toSend += `**${message.user}** joined channel\n`
+							toSend += `**${message.user.replaceAll("_", "\\_")}** joined channel\n`
 							break
 
 						case MessageType.Leave:
-							toSend += `**${message.user}** left channel\n`
+							toSend += `**${message.user.replaceAll("_", "\\_")}** left channel\n`
 							break
 
 						case MessageType.Send:
