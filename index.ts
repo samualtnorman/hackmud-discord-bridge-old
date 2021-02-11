@@ -82,8 +82,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 								}
 							}
 
-							// TODO mention user
-							promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, commandResponse!))
+							promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, renderColour(`${stringifyDiscordUser(message.author)}, ${commandResponse}`)))
 						}
 					} else {
 						message.react("\u274C")
