@@ -394,6 +394,16 @@ function renderColour(text: string) {
 
 				break
 
+			case "\n":
+				if (colourStack.length && !unopened) {
+					o += "`"
+					unopened = true
+				}
+
+				o += "\n"
+
+				break
+
 			default:
 				if (unopened && colourStack.length) {
 					o += "`" + colourStack[colourStack.length - 1]
