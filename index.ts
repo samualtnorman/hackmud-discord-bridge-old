@@ -206,10 +206,11 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 									toSend += `\n${commandResponse}\n`
 
-									if (chatbot)
+									if (chatbot) {
 										hackmudChatAPI.sendMessage(chatbot, channel, commandResponse)
-
-									channelsLastUser.delete(channel)
+										channelsLastUser.set(channel, chatbot)
+									} else
+										channelsLastUser.delete(channel)
 								}
 							}
 
@@ -470,8 +471,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 						const advert = adverts[Math.floor(Math.random() * adverts.length)]
 
 						hackmudChatAPI.sendMessage(chatbot, "0000", advert)
-						discordChannels.get("0000")?.send(processHackmudMessageText({ user: chatbot, content: advert }))
-						channelsLastUser.delete("0000")
+						discordChannels.get("0000")?.send(processHackmudMessageText({ user: chatbot, content: advert }, channelsLastUser.get("0000") != chatbot))
+						channelsLastUser.set("0000", chatbot)
 					}
 				}
 
@@ -500,7 +501,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			})
 
 		const discordAPI = new DiscordClient({ retryLimit: 4 })
-			.on("ready", async () => {
+			.on("ready", () => {
 				[ guild ] = discordAPI.guilds.cache.array()
 
 				for (const channel of guild.channels.cache.array()) {
@@ -514,11 +515,10 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 					adminChannel = adminChannel_
 
 				processHackmudMessages(preDiscordReadyMessageBuffer)
+
 				preDiscordReadyMessageBuffer.length = 0
 			})
 			.on("message", message => {
-				console.log("a", users)
-
 				if (users)
 					processDiscordMessage(message, users)
 				else
