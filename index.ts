@@ -94,7 +94,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 									}
 								}
 
-								promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, renderColour(`${stringifyDiscordUser(message.author, false, channel)}, ${commandResponse}`)))
+								promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, renderColour(` ${stringifyDiscordUser(message.author, false, channel)}, ${commandResponse} `)))
 							}
 
 							return
@@ -131,7 +131,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 								}
 							}
 
-							promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, renderColour(`${stringifyDiscordUser(message.author, false, channel)}, ${commandResponse}`)))
+							promise.then(() => hackmudChatAPI.sendMessage(chatbot!, channel, renderColour(` ${stringifyDiscordUser(message.author, false, channel)}, ${commandResponse} `)))
 						}
 					} else {
 						message.react("\u274C")
