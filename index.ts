@@ -54,7 +54,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				channelsLastUser.delete(channel)
 
 				if (message.content.startsWith(`<@!${discordAPI.user!.id}>`) || message.content.startsWith(`<@${discordAPI.user!.id}>`)) {
-					commandResponse = await processCommand(message.content.slice(message.content.indexOf(">") + 1).trimLeft(), message.author, channel)
+					commandResponse = await processCommand(message.content.slice(message.content.indexOf(">") + 1).trimLeft(), message)
 
 					if (commandResponse)
 						message.reply(commandResponse)
@@ -135,7 +135,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 						}
 					} else {
 						message.react("\u274C")
-						discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}> missing host in channel **${channel}**`)
+						adminChannel?.send(`<@${guild!.ownerID}> missing host in channel **${channel}**`)
 					}
 				}
 			}
@@ -146,9 +146,9 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 			for (const message of messages) {
 				if (message.type == HackmudMessageType.Tell)
-					discordChannels.get(config.adminChannel)?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
+					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 				else if (hosts.includes(message.user) || chatbots.includes(message.user) || ownerUsers.includes(message.user))
-					discordChannels.get(config.adminChannel)?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
+					adminChannel?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 				else
 					channelMessages.get(message.channel).push(message)
 			}
@@ -178,7 +178,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 							channelsLastUser.set(channel, message.user)
 
 							if (chatbots.includes(message.content.trim().slice(1).split(" ")[0])) {
-								let commandResponse = await processCommand(message.content.trim().split(" ").slice(1).join(" "), message.user, channel)
+								let commandResponse = await processCommand(message.content.trim().split(" ").slice(1).join(" "), message)
 
 								if (commandResponse) {
 									let chatbot: string | undefined
@@ -210,7 +210,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 				if (discordChannel)
 					discordChannel.send(toSend)
 				else
-					discordChannels.get(config.adminChannel)?.send(`channel **${channel}**...\n${toSend}`)
+					adminChannel?.send(`channel **${channel}**...\n${toSend}`)
 			}
 		}
 
@@ -255,8 +255,18 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 		}
 
 
-		const processCommand = async (fullCommand: string, author: DiscordUser | string, channel?: string): Promise<string> => {
+		const processCommand = async (fullCommand: string, message: HackmudChannelMessage | DiscordMessage): Promise<string> => {
 			const [ command, ...args ] = fullCommand.split(" ")
+
+			let author
+			let channel
+
+			if (message instanceof DiscordMessage) {
+				const discordChannel = message.channel as DiscordTextChannel
+				channel = discordChannel.topic || discordChannel.name
+				author = message.author
+			} else
+				({ user: author, channel } = message)
 
 			switch (command) {
 				case "ping":
@@ -324,7 +334,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 					return "what do you mean?"
 
-				case "add-advert":
+				case "add-advert": {
 					const advert = args.join(" ")
 
 					adverts.push(advert)
@@ -332,6 +342,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 
 					return "added:```\n" + advert + "```"
+				}
 
 				case "help":
 					return readFile("./help.txt", { encoding: "utf-8" })
@@ -351,6 +362,26 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 
 					return `I will notify your for ${args.join(", ")}`
+				}
+
+				case "set-admin-channel": {
+					let discordChannel
+
+					if (message instanceof DiscordMessage)
+						discordChannel = message.channel as DiscordTextChannel
+					else
+						discordChannel = discordChannels.get(channel)
+
+					if (discordChannel) {
+						adminChannel = discordChannel
+						config.adminChannel = adminChannel.id
+
+						writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
+
+						return "set this channel as the admin channel"
+					}
+
+					return "did not set the admin channel"
 				}
 
 				default:
@@ -468,6 +499,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 		const channelsLastUser = new Map<string, string>()
 
+		let adminChannel: DiscordTextChannel | undefined
+
 		const discordAPI = new DiscordClient({ retryLimit: 4 })
 			.on("ready", async () => {
 				[ guild ] = discordAPI.guilds.cache.array()
@@ -476,6 +509,11 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 					if (channel.isText() && channel.type == "text")
 						discordChannels.set(channel.topic || channel.name, channel)
 				}
+
+				const adminChannel_ = guild.channels.resolve(config.adminChannel)
+
+				if (adminChannel_ instanceof DiscordTextChannel)
+					adminChannel = adminChannel_
 
 				processHackmudMessages(preDiscordReadyMessageBuffer)
 				preDiscordReadyMessageBuffer.length = 0
