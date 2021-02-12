@@ -81,3 +81,15 @@ export async function asyncReplace(str: string, regex: RegExp, asyncFn: (substri
 
 	return str.replace(regex, () => data.shift()!)
 }
+
+export function* matches(regex: RegExp, string: string) {
+	let current
+
+	while (current = regex.exec(string)) {
+		yield {
+			index: current.index,
+			match: current[1] ?? current[0],
+			matches: [ ...current ]
+		}
+	}
+}

@@ -1,6 +1,6 @@
 import { ChannelMessage as HackmudChannelMessage, HackmudChatAPI, MessageType as HackmudMessageType, MessageType, TellMessage as HackmudTellMessage } from "@samual/hackmud-chat-api"
 import { readFile, writeFile } from "fs/promises"
-import { validate, DynamicMap, asyncReplace } from "./lib"
+import { validate, DynamicMap, asyncReplace, matches } from "./lib"
 import { Client as DiscordClient, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
 
 // const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
@@ -15,7 +15,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 		discordToken: "string",
 		roles: {},
 		colors: {},
-		advert: [ "string" ]
+		advert: [ "string" ],
+		mentionNotifications: {}
 	})) {
 		let hosts: string[]
 
@@ -52,8 +53,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 				channelsLastUser.delete(channel)
 
-				if (message.content.startsWith(`<@!${discordAPI.user!.id}>`)) {
-					commandResponse = await processCommand(message.content.replace(`<@!${discordAPI.user!.id}> `, ""), message.author, channel)
+				if (message.content.startsWith(`<@!${discordAPI.user!.id}>`) || message.content.startsWith(`<@${discordAPI.user!.id}>`)) {
+					commandResponse = await processCommand(message.content.slice(message.content.indexOf(">") + 1).trimLeft(), message.author, channel)
 
 					if (commandResponse)
 						message.reply(commandResponse)
@@ -235,7 +236,22 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 			if (content.split("\n").length == 1)
 				content = content.trim()
 
-			return o + "```\n" + content.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, (_, match) => match).replace(/`/g, "`\u200B") + "```"
+			o += "```\n" + content.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, (_, match) => match).replace(/`/g, "`\u200B") + "```"
+
+			const mentionNotifications = config.mentionNotifications as Record<string, string[]>
+
+			const discordUsersToMention = new Set<string>()
+
+			for (const { match } of matches(/@([a-z_][a-z_0-9]{0,24})([^a-z_0-9]|$)/g, content)) {
+				const discordUsers = mentionNotifications[match]
+
+				if (discordUsers) {
+					for (const discordUser of discordUsers)
+						discordUsersToMention.add(discordUser)
+				}
+			}
+
+			return o + [ ...discordUsersToMention ].join(" ")
 		}
 
 
@@ -319,6 +335,23 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(config =>
 
 				case "help":
 					return readFile("./help.txt", { encoding: "utf-8" })
+
+				case "notify-me-for": {
+					if (typeof author == "string")
+						return "I don't support that"
+
+					if (!args.length)
+						return "I need a name"
+
+					const mentionNotifications = config.mentionNotifications as Record<string, string[]>
+
+					for (const user of args)
+						(mentionNotifications[user] = mentionNotifications[user] || []).push(author.toString())
+
+					writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
+
+					return `I will notify your for ${args.join(", ")}`
+				}
 
 				default:
 					return "unknown command"
