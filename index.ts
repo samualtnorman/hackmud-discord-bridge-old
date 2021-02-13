@@ -429,8 +429,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 			if (!userColours[id]) {
 				userColours[id] = `${colours[Math.floor(Math.random() * colours.length)]}${colours[Math.floor(Math.random() * colours.length)]}`
-				writeFile("./config.json", JSON.stringify(config, undefined, "\t")).then(() => console.log("wrote config file"))
-				console.log("writing config file")
+				writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 			}
 
 			if (messagePre)
