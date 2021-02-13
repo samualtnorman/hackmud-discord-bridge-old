@@ -173,14 +173,14 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 						case MessageType.Join:
 							toSend += `**${message.user.replaceAll("_", "\\_")}** joined channel\n`
 
-							channelsLastUser.set(channel, message.user)
+							channelsLastUser.delete(channel)
 
 							break
 
 						case MessageType.Leave:
 							toSend += `**${message.user.replaceAll("_", "\\_")}** left channel\n`
 
-							channelsLastUser.set(channel, message.user)
+							channelsLastUser.delete(channel)
 
 							break
 
@@ -246,10 +246,12 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				o += ":"
 			}
 
+			content = removeColorCodes(content)
+
 			if (content.split("\n").length == 1)
 				content = content.trim()
 
-			o += "```\n" + removeColorCodes(content).replace(/`/g, "`\u200B") + "```"
+			o += "```\n" + content.replace(/`/g, "`\u200B") + "```"
 
 			const mentionNotifications = config.mentionNotifications as Record<string, string[]>
 			const discordUsersToMention = new Set<string>()
