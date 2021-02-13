@@ -59,6 +59,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 						if (commandResponse)
 							message.reply(commandResponse)
+						else
+							message.react("\u2705")
 					}
 
 					if (channel.match(/^\w{1,50}$/)) {
@@ -399,6 +401,44 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 					}
 
 					return "did not set the admin channel"
+				}
+
+				case "set-user-color": {
+					if (!(message instanceof DiscordMessage))
+						return "I can only set the user color of discord users"
+
+					if (!args[0] || !args[0].match(/^[a-zA-Z]$/))
+						return "I need the color code (a-z, A-Z)"
+
+					stringifyDiscordUser(message.author)
+
+					const id = message.author.toString()
+					const userColours = config.colors as Record<string, string>
+
+					userColours[id] = `${args[0]}${userColours[id][1]}`
+
+					writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
+
+					return ""
+				}
+
+				case "set-text-color": {
+					if (!(message instanceof DiscordMessage))
+						return "I can only set the text color of discord users"
+
+					if (!args[0] || !args[0].match(/^[a-zA-Z]$/))
+						return "I need the color code (a-z, A-Z)"
+
+					stringifyDiscordUser(message.author)
+
+					const id = message.author.toString()
+					const userColours = config.colors as Record<string, string>
+
+					userColours[id] = `${userColours[id][0]}${args[0]}`
+
+					writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
+
+					return ""
 				}
 
 				default:
