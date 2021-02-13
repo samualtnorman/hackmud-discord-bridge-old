@@ -46,7 +46,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 		else
 			ownerUsers = config.ownerUser
 
-		const processDiscordMessage = async (message: DiscordMessage, users: Map<string, string[]>) => {
+		const processDiscordMessage = async (message: DiscordMessage) => {
 			if (message.author != discordAPI.user) {
 				if (message.channel instanceof DiscordTextChannel) {
 					let commandResponse: string | undefined
@@ -559,24 +559,26 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 				preDiscordReadyMessageBuffer.length = 0
 			})
-			.on("message", message => {
-				if (users)
-					processDiscordMessage(message, users)
-				else
-					preGetChannelsMessageBuffer.push(message)
-			})
+			.on("message", preGetChannelsMessageEventListener)
 
 		discordAPI.login(config.discordToken)
 
 		const users = await hackmudChatAPI.getChannels()
 
 		for (const message of preGetChannelsMessageBuffer)
-			processDiscordMessage(message, users)
+			processDiscordMessage(message)
 
 		preGetChannelsMessageBuffer.length = 0
 
+		discordAPI.removeListener("message", preGetChannelsMessageEventListener)
+		discordAPI.on("message", processDiscordMessage)
+
 		reloadConfigLoop()
 		advertLoop()
+
+		function preGetChannelsMessageEventListener(message: DiscordMessage) {
+			preGetChannelsMessageBuffer.push(message)
+		}
 	} else
 		console.log("invalid config")
 })
