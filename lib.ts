@@ -1,55 +1,64 @@
-export type ValidReference = "boolean" | "number" | "string" | ValidReference[] | { [key: string]: ValidReference }
+export type ValidReference = "boolean" | "number" | "string" | { [key: string]: ValidReference } | [ "array" | "union" | "record", ValidReference[] ]
 
-export type StringToType<T extends ValidReference> =
+type StringToType<T extends ValidReference> =
 	T extends "boolean"
 		? boolean :
 	T extends "number"
 		? number :
 	T extends "string"
 		? string :
-	T extends ValidReference[]
-		? StringToType<T[number]>[] | StringToType<T[number]> :
+	T extends [ "array", ValidReference[] ]
+		? StringToType<T[1][number]>[] :
+	T extends [ "union", ValidReference[] ]
+		? StringToType<T[1][number]> :
+	T extends [ "record", ValidReference[] ]
+		? Record<string, StringToType<T[1][number]>> :
 	T extends { [key: string]: ValidReference }
 		? { [K in keyof T]: StringToType<T[K]> } :
 	never
 
-export function validate<T extends ValidReference>(target: any, validRef: T): target is StringToType<T> {
-	const { isArray } = Array
+export function validate<T extends ValidReference>(target: unknown, validReference: T): target is StringToType<T> {
+	if (validReference instanceof Array) {
+		const [ type, validReferenceUnion ] = validReference as [ "array" | "union" | "record", ValidReference[] ]
 
-	if (isArray(validRef)) {
-		if (isArray(target)) {
-			for (const value of target) {
-				const isValid = validate(value, validRef)
-
-				if (!isValid)
+		switch (type) {
+			case "array":
+				if (!(target instanceof Array))
 					return false
-			}
 
-			return true
-		}
+				for (const value of target) {
+					if (!validate(value, [ "union", validReferenceUnion ]))
+						return false
+				}
 
-		for (const value of validRef) {
-			const isValid = validate(target, value)
-
-			if (isValid)
 				return true
-		}
 
-		return false
+			case "union":
+				for (const validReferenceUnionValue of validReferenceUnion) {
+					if (validate(target, validReferenceUnionValue))
+						return true
+				}
+
+				return false
+
+			case "record":
+				if (typeof target != "object" || !target)
+					return false
+
+				return validate(Object.values(target), [ "array", validReferenceUnion ])
+		}
 	}
 
-	if (target && typeof validRef == "object" && typeof target == "object") {
-		for (const [ key, value ] of Object.entries(validRef)) {
-			const isValid = validate(target[key], value)
-
-			if (!isValid)
+	if (target && typeof validReference == "object" && typeof target == "object") {
+		for (const [ key, value ] of Object.entries(validReference)) {
+			if (!validate((target as Record<string, unknown>)[key], value))
 				return false
 		}
 
 		return true
 	}
 
-	return typeof target == validRef
+	return typeof target == validReference
 }
 
 export class DynamicMap<K, V> extends Map<K, V> {

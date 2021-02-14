@@ -7,48 +7,20 @@ import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Message 
 
 readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async config => {
 	if (!validate(config, {
-		host: [ "string" ],
-		chatbot: [ "string" ],
-		ownerUser: [ "string" ],
+		hosts: [ "array", [ "string" ] ],
+		chatbots: [ "array", [ "string" ] ],
+		ownerUsers: [ "array", [ "string" ] ],
 		adminChannel: "string",
 		hackmudToken: "string",
 		discordToken: "string",
-		roles: {},
-		colors: {},
-		advert: [ "string" ],
-		mentionNotifications: {}
+		roles: [ "record", [ [ "array", [ "string" ] ] ] ],
+		colors: [ "record", [ "string" ] ],
+		adverts: [ "array", [ "string" ] ],
+		mentionNotifications: [ "record", [ [ "array", [ "string" ] ] ] ]
 	})) {
 		console.log("invalid config")
 		return
 	}
-
-	let hosts: string[]
-
-	if (typeof config.host == "string")
-		hosts = [ config.host ]
-	else
-		hosts = config.host
-
-	let chatbots: string[]
-
-	if (typeof config.chatbot == "string")
-		chatbots = [ config.chatbot ]
-	else
-		chatbots = config.chatbot
-
-	let adverts: string[]
-
-	if (typeof config.advert == "string")
-		adverts = [ config.advert ]
-	else
-		adverts = config.advert
-
-	let ownerUsers: string[]
-
-	if (typeof config.ownerUser == "string")
-		ownerUsers = [ config.ownerUser ]
-	else
-		ownerUsers = config.ownerUser
 
 	const processDiscordMessage = async (message: DiscordMessage) => {
 		if (message.author == discordAPI.user)
@@ -78,7 +50,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			let messageFromOwner = message.member == guild!.owner
 
 			if (messageFromOwner) {
-				for (const user of ownerUsers) {
+				for (const user of config.ownerUsers) {
 					if (users.get(user)?.includes(channel)) {
 						host = user
 						break
@@ -93,7 +65,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			}
 
 			if (!messageFromOwner) {
-				for (const user of hosts) {
+				for (const user of config.hosts) {
 					if (users.get(user)?.includes(channel)) {
 						host = user
 						break
@@ -114,7 +86,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			)
 
 			if (messageFromOwner) {
-				toSend = ` [${(config.colors as Record<string, string>)[message.author.toString()][1]}${toSend} `
+				toSend = ` [${config.colors[message.author.toString()][1]}${toSend} `
 			} else {
 				toSend = ` ${stringifyDiscordUser(message.author, true, channel)}${toSend} `
 			}
@@ -126,7 +98,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 			let chatbot: string | undefined
 
-			for (const user of chatbots) {
+			for (const user of config.chatbots) {
 				if (users.get(user)?.includes(channel)) {
 					chatbot = user
 					break
@@ -148,15 +120,15 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 	}
 
 	const processHackmudMessages = async (messages: (HackmudChannelMessage | HackmudTellMessage)[]) => {
-		const channelMessages = new DynamicMap<string, HackmudChannelMessage[]>(() => [] as HackmudChannelMessage[])
+		const channelMessages = new DynamicMap<string, HackmudChannelMessage[]>(Array)
 
 		for (const message of messages) {
 			if (message.type == HackmudMessageType.Tell) {
-				if (chatbots.includes(message.toUser))
+				if (config.chatbots.includes(message.toUser))
 					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${await processCommand(removeColorCodes(message.content).trim(), message)} `)
 				else
 					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
-			} else if (hosts.includes(message.user) || chatbots.includes(message.user) || ownerUsers.includes(message.user))
+			} else if (config.hosts.includes(message.user) || config.chatbots.includes(message.user) || config.ownerUsers.includes(message.user))
 				adminChannel?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 			else
 				channelMessages.get(message.channel).push(message)
@@ -186,13 +158,13 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 						channelsLastUser.set(channel, message.user)
 
-						if (chatbots.includes(message.content.trim().slice(1).split(" ")[0])) {
+						if (config.chatbots.includes(message.content.trim().slice(1).split(" ")[0])) {
 							let commandResponse = await processCommand(removeColorCodes(message.content).trim().split(" ").slice(1).join(" "), message)
 
 							if (commandResponse) {
 								let chatbot: string | undefined
 
-								for (const user of chatbots) {
+								for (const user of config.chatbots) {
 									if (users.get(user)?.includes(channel)) {
 										chatbot = user
 										break
@@ -232,7 +204,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 			const roles: string[] = []
 
-			for (const [ role, users ] of Object.entries(config.roles as Record<string, string[]>)) {
+			for (const [ role, users ] of Object.entries(config.roles)) {
 				if (users.includes(user))
 					roles.push(role)
 			}
@@ -250,11 +222,10 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 		o += "```\n" + content.replace(/`/g, "`\u200B") + "```"
 
-		const mentionNotifications = config.mentionNotifications as Record<string, string[]>
 		const discordUsersToMention = new Set<string>()
 
 		for (const { match } of matches(/@([a-z_][a-z_0-9]{0,24})([^a-z_0-9]|$)/g, content)) {
-			const discordUsers = mentionNotifications[match]
+			const discordUsers = config.mentionNotifications[match]
 
 			if (discordUsers) {
 				for (const discordUser of discordUsers)
@@ -273,6 +244,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 		if (message instanceof DiscordMessage) {
 			const discordChannel = message.channel as DiscordTextChannel
+
 			channel = discordChannel.topic || discordChannel.name
 			author = message.author
 		} else {
@@ -290,20 +262,23 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				console.log("emergency stop")
 				process.exit(1)
 
-			case "add-role":
+			case "add-role": {
 				const [ role, user ] = args.join(" ").split(" to ")
-				;(config.roles as Record<string, string[]>)[role].push(user)
+
+				config.roles[role].push(user)
 				writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
+
 				return `added @${user} to ${role} role`
+			}
 
 			case "tell":
-				if (!hosts.length)
+				if (!config.hosts.length)
 					return "tell command not available"
 
 				if (author instanceof DiscordUser) {
 					try {
 						await hackmudChatAPI.tellMessage(
-							hosts[0], args[0],
+							config.hosts[0], args[0],
 							renderColor(` ${stringifyDiscordUser(author, true, channel)}${args.slice(1).join(" ").replaceAll("`", "«").replaceAll("\\", "\\\\").replaceAll("[", "\\[").replaceAll("]", "\\]")} `)
 						)
 					} catch (error) {
@@ -311,7 +286,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 					}
 				} else {
 					try {
-						await hackmudChatAPI.tellMessage(hosts[0], args[0], " @" + author + ": " + args.slice(1).join(" ") + " ")
+						await hackmudChatAPI.tellMessage(config.hosts[0], args[0], " @" + author + ": " + args.slice(1).join(" ") + " ")
 					} catch (error) {
 						return error.message
 					}
@@ -351,8 +326,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			case "add-advert": {
 				const advert = args.join(" ")
 
-				adverts.push(advert)
-				config.advert = adverts
+				config.adverts.push(advert)
 				writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 
 				return "added:```\n" + advert + "```"
@@ -368,10 +342,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				if (!args.length)
 					return "I need a name"
 
-				const mentionNotifications = config.mentionNotifications as Record<string, string[]>
-
 				for (const user of args)
-					(mentionNotifications[user] = mentionNotifications[user] || []).push(author.toString())
+					(config.mentionNotifications[user] = config.mentionNotifications[user] || []).push(author.toString())
 
 				writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 
@@ -408,9 +380,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				stringifyDiscordUser(message.author)
 
 				const id = message.author.toString()
-				const userColours = config.colors as Record<string, string>
 
-				userColours[id] = `${args[0]}${userColours[id][1]}`
+				config.colors[id] = `${args[0]}${config.colors[id][1]}`
 
 				writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 
@@ -427,9 +398,8 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				stringifyDiscordUser(message.author)
 
 				const id = message.author.toString()
-				const userColours = config.colors as Record<string, string>
 
-				userColours[id] = `${userColours[id][0]}${args[0]}`
+				config.colors[id] = `${config.colors[id][0]}${args[0]}`
 
 				writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 
@@ -444,14 +414,14 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 	const stringifyDiscordUser = (user: DiscordUser, messagePre = false, channel?: string) => {
 		if (channel) {
 			if (user.id == discordAPI.user!.id) {
-				for (const user of chatbots) {
+				for (const user of config.chatbots) {
 					if (users.get(user)?.includes(channel))
 						return `@${user}`
 				}
 			}
 
 			if (user.id == guild!.ownerID) {
-				for (const user of ownerUsers) {
+				for (const user of config.ownerUsers) {
 					if (users.get(user)?.includes(channel))
 						return `@${user}`
 				}
@@ -460,17 +430,16 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 		const colours = "ABCDEFGHIJKLMNOPQSTUVWXYbcdefghijklmnopqstuvwxy"
 		const id = user.toString()
-		const userColours = config.colors as Record<string, string>
 
-		if (!userColours[id]) {
-			userColours[id] = `${colours[Math.floor(Math.random() * colours.length)]}${colours[Math.floor(Math.random() * colours.length)]}`
+		if (!config.colors[id]) {
+			config.colors[id] = `${colours[Math.floor(Math.random() * colours.length)]}${colours[Math.floor(Math.random() * colours.length)]}`
 			writeFile("./config.json", JSON.stringify(config, undefined, "\t"))
 		}
 
 		if (messagePre)
-			return `[${userColours[id][0]}${user.username}][c#][C${user.discriminator}]: [${userColours[id][1]}`
+			return `[${config.colors[id][0]}${user.username}][c#][C${user.discriminator}]: [${config.colors[id][1]}`
 
-		return `[${userColours[id][0]}${user.username}][c#][C${user.discriminator}]`
+		return `[${config.colors[id][0]}${user.username}][c#][C${user.discriminator}]`
 	}
 
 	const reloadConfigLoop = () => {
@@ -493,10 +462,10 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 	const advertLoop = () => {
 		setTimeout(() => {
-			if (adverts.length) {
+			if (config.adverts.length) {
 				let chatbot: string | undefined
 
-				for (const user of chatbots) {
+				for (const user of config.chatbots) {
 					if (users.get(user)?.includes("0000")) {
 						chatbot = user
 						break
@@ -504,7 +473,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				}
 
 				if (chatbot) {
-					const advert = adverts[Math.floor(Math.random() * adverts.length)]
+					const advert = config.adverts[Math.floor(Math.random() * config.adverts.length)]
 
 					hackmudChatAPI.sendMessage(chatbot, "0000", advert)
 					discordChannels.get("0000")?.send(processHackmudMessageText({ user: chatbot, content: advert }, channelsLastUser.get("0000") != chatbot))
@@ -545,7 +514,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			;[ guild ] = discordAPI.guilds.cache.array()
 
 			for (const channel of guild.channels.cache.array()) {
-				if (channel.isText() && channel.type == "text")
+				if (channel instanceof DiscordTextChannel)
 					discordChannels.set(channel.topic || channel.name, channel)
 			}
 
