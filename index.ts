@@ -559,7 +559,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 				preDiscordReadyMessageBuffer.length = 0
 			})
-			.on("message", preGetChannelsMessageEventListener)
+			.on("message", preGetChannelsOnMessageEventListener)
 
 		discordAPI.login(config.discordToken)
 
@@ -570,13 +570,13 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 		preGetChannelsMessageBuffer.length = 0
 
-		discordAPI.removeListener("message", preGetChannelsMessageEventListener)
+		discordAPI.removeListener("message", preGetChannelsOnMessageEventListener)
 		discordAPI.on("message", processDiscordMessage)
 
 		reloadConfigLoop()
 		advertLoop()
 
-		function preGetChannelsMessageEventListener(message: DiscordMessage) {
+		function preGetChannelsOnMessageEventListener(message: DiscordMessage) {
 			preGetChannelsMessageBuffer.push(message)
 		}
 	} else
