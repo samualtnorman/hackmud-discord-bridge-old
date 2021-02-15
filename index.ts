@@ -51,7 +51,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 			if (messageFromOwner) {
 				for (const user of config.ownerUsers) {
-					if (users.get(user)?.includes(channel)) {
+					if (usersChannels.get(user)?.includes(channel)) {
 						host = user
 						break
 					}
@@ -66,7 +66,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 			if (!messageFromOwner) {
 				for (const user of config.hosts) {
-					if (users.get(user)?.includes(channel)) {
+					if (usersChannels.get(user)?.includes(channel)) {
 						host = user
 						break
 					}
@@ -99,7 +99,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			let chatbot: string | undefined
 
 			for (const user of config.chatbots) {
-				if (users.get(user)?.includes(channel)) {
+				if (usersChannels.get(user)?.includes(channel)) {
 					chatbot = user
 					break
 				}
@@ -125,7 +125,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 		for (const message of messages) {
 			if (message.type == HackmudMessageType.Tell) {
 				if (config.chatbots.includes(message.toUser))
-					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${await processCommand(removeColorCodes(message.content).trim(), message)} `)
+					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${(await processCommand(removeColorCodes(message.content).trim(), message) || "okay")} `)
 				else
 					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 			} else if (config.hosts.includes(message.user) || config.chatbots.includes(message.user) || config.ownerUsers.includes(message.user))
@@ -165,7 +165,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 								let chatbot: string | undefined
 
 								for (const user of config.chatbots) {
-									if (users.get(user)?.includes(channel)) {
+									if (usersChannels.get(user)?.includes(channel)) {
 										chatbot = user
 										break
 									}
@@ -200,7 +200,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 		let o = ""
 
 		if (head) {
-			o += `**${user}**`
+			o += `**${user.replaceAll("_", "\\_")}**`
 
 			const roles: string[] = []
 
@@ -274,6 +274,9 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			case "tell":
 				if (!config.hosts.length)
 					return "tell command not available"
+
+				if (config.chatbots.includes(args[0]))
+					return "I know what you're up to"
 
 				if (author instanceof DiscordUser) {
 					try {
@@ -412,19 +415,18 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 	}
 
 	const stringifyDiscordUser = (user: DiscordUser, messagePre = false, channel?: string) => {
-		if (channel) {
-			if (user.id == discordAPI.user!.id) {
-				for (const user of config.chatbots) {
-					if (users.get(user)?.includes(channel))
-						return `@${user}`
-				}
-			}
+		let users = {
+			[discordAPI.user!.id]: config.chatbots,
+			[guild!.ownerID]: config.ownerUsers
+		}[user.id]
 
-			if (user.id == guild!.ownerID) {
-				for (const user of config.ownerUsers) {
-					if (users.get(user)?.includes(channel))
-						return `@${user}`
-				}
+		if (users) {
+			if (!channel)
+				return `@${users[0]}`
+
+			for (const user of users) {
+				if (usersChannels.get(user)?.includes(channel))
+					return `@${user}`
 			}
 		}
 
@@ -466,7 +468,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 				let chatbot: string | undefined
 
 				for (const user of config.chatbots) {
-					if (users.get(user)?.includes("0000")) {
+					if (usersChannels.get(user)?.includes("0000")) {
 						chatbot = user
 						break
 					}
@@ -531,7 +533,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 
 	discordAPI.login(config.discordToken)
 
-	const users = await hackmudChatAPI.getChannels()
+	const usersChannels = await hackmudChatAPI.getChannels()
 
 	for (const message of preGetChannelsMessageBuffer)
 		processDiscordMessage(message)
