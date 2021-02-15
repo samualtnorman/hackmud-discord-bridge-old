@@ -80,7 +80,7 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 			}
 
 			let toSend = await asyncReplace(
-				message.content.replaceAll("`", "«").replaceAll("\\", "\\\\").replaceAll("[", "\\[").replaceAll("]", "\\]"),
+				processDiscordText(message.content),
 				/<@!?(\d+)>/g,
 				async (_, id) => stringifyDiscordUser(await discordAPI.users.fetch(id), false, channel)
 			)
@@ -279,23 +279,21 @@ readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse).then(async con
 					return "I know what you're up to"
 
 				if (author instanceof DiscordUser) {
-					try {
-						await hackmudChatAPI.tellMessage(
-							config.hosts[0], args[0],
-							renderColor(` ${stringifyDiscordUser(author, true, channel)}${args.slice(1).join(" ").replaceAll("`", "«").replaceAll("\\", "\\\\").replaceAll("[", "\\[").replaceAll("]", "\\]")} `)
-						)
-					} catch (error) {
-						return error.message
+					if (config.ownerUsers.length && author.id == guild!.ownerID) {
+						return hackmudChatAPI.tellMessage(
+							config.ownerUsers[0],
+							args[0],
+							renderColor(` ${processDiscordText(args.slice(1).join(" "))} `)
+						).then(() => "", ({ message }) => message)
+					} else {
+						return hackmudChatAPI.tellMessage(
+							config.hosts[0],
+							args[0],
+							renderColor(` ${stringifyDiscordUser(author, true, channel)}${processDiscordText(args.slice(1).join(" "))} `)
+						).then(() => "", ({ message }) => message)
 					}
-				} else {
-					try {
-						await hackmudChatAPI.tellMessage(config.hosts[0], args[0], " @" + author + ": " + args.slice(1).join(" ") + " ")
-					} catch (error) {
-						return error.message
-					}
-				}
-
-				return ""
+				} else
+					return hackmudChatAPI.tellMessage(config.hosts[0], args[0], " @" + author + ": " + args.slice(1).join(" ") + " ").then(() => "", ({ message }) => message)
 
 			case "users":
 				if (channel == config.adminChannel) {
@@ -631,4 +629,8 @@ function renderColor(text: string) {
 
 function removeColorCodes(text: string) {
 	return text.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, "$1")
+}
+
+function processDiscordText(text: string) {
+	return text.replaceAll("`", "«").replaceAll("\\", "\\\\").replaceAll("[", "\\[").replaceAll("]", "\\]")
 }
