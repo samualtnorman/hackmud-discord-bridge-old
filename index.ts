@@ -90,12 +90,12 @@ Promise.all([
 			)
 
 			if (messageFromOwner) {
-				toSend = ` [${config.colors[message.author.toString()][1]}${toSend} `
+				toSend = `[${config.colors[message.author.toString()][1]}${toSend} `
 			} else {
-				toSend = ` ${stringifyDiscordUser(message.author, true, channel)}${toSend} `
+				toSend = `${stringifyDiscordUser(message.author, true, channel)}${toSend} `
 			}
 
-			await hackmudChatAPI.sendMessage(host, channel, renderColor(toSend))
+			await hackmudChatAPI.sendMessage(host, channel, renderColor(`${toSend.includes("\n") ? "\n" : " "}${toSend}`))
 
 			if (!commandResponse)
 				return
