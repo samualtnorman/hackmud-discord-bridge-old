@@ -2,6 +2,8 @@ import { ChannelMessage as HackmudChannelMessage, HackmudChatAPI, MessageType as
 import { readFile, writeFile } from "fs/promises"
 import { validate, DynamicMap, asyncReplace, matches } from "./lib"
 import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
+import { mouseClick, keyTap, keyToggle } from "robotjs"
+import { write } from "clipboardy"
 
 // const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
 
@@ -17,6 +19,7 @@ Promise.all([
 		adminChannel: "string",
 		hackmudToken: "string",
 		discordToken: "string",
+		enableOOG: "boolean",
 		roles: [ "record", [ [ "array", [ "string" ] ] ] ],
 		colors: [ "record", [ "string" ] ],
 		adverts: [ "array", [ "string" ] ],
@@ -129,7 +132,7 @@ Promise.all([
 		for (const message of messages) {
 			if (message.type == HackmudMessageType.Tell) {
 				if (config.chatbots.includes(message.toUser))
-					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${(await processCommand(removeColorCodes(message.content).trim(), message) || "okay")} `)
+					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${(await processCommand(removeColorCodes(message.content).trim(), message) || "ok")} `)
 				else
 					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 			} else if (config.hosts.includes(message.user) || config.chatbots.includes(message.user) || config.ownerUsers.includes(message.user))
@@ -410,6 +413,17 @@ Promise.all([
 
 				return ""
 			}
+
+			case "run":
+				if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
+					return "no"
+
+				await write(args.join(" "))
+				keyTap("escape")
+				mouseClick("right")
+				keyToggle("enter", "down")
+
+				return ""
 
 			default:
 				return "unknown command"
