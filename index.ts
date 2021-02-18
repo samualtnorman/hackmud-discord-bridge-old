@@ -133,7 +133,7 @@ Promise.all([
 			if (message.type == HackmudMessageType.Tell) {
 				if (config.chatbots.includes(message.toUser))
 					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${(await processCommand(removeColorCodes(message.content).trim(), message) || "ok")} `)
-				else
+				else if ([ ...usersChannels.keys() ].includes(message.toUser) && !config.hosts.includes(message.user) && !config.chatbots.includes(message.user))
 					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 			} else if (config.hosts.includes(message.user) || config.chatbots.includes(message.user) || config.ownerUsers.includes(message.user))
 				adminChannel?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
