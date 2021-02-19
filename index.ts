@@ -7,6 +7,18 @@ import { write } from "clipboardy"
 
 // const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
 
+const oogBotCommandQueue: {
+	id: string
+	command: string
+}[] = []
+
+let oogBotCurrentID: string | null = null
+
+// setTimeout(() => {
+// 	oogBotCurrentID = null
+// 	oogBotRunCommand()
+// }, 5000)
+
 Promise.all([
 	readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse),
 	// ./emojis.json based on https://gist.github.com/Vexs/629488c4bb4126ad2a9909309ed6bd71
@@ -415,13 +427,51 @@ Promise.all([
 			}
 
 			case "run":
+				if (!config.enableOOG)
+					return "oog bot disabled"
+
+				if (author instanceof DiscordUser) {
+					if (author.id != guild!.ownerID)
+						return "no"
+
+					return "not yet"
+				} else {
+					if (![ ...usersChannels.keys() ].includes(author))
+						return "no"
+
+					const [ id, script, ...scriptArgs ] = args
+
+					let command = `swan.oog { i: "${id}", s: #s.${script}`
+
+					if (scriptArgs.length)
+						command += `, a: ${scriptArgs.join(" ")}`
+
+					command += " }"
+
+					oogBotCommandQueue.push({ id, command })
+					oogBotRunCommand()
+				}
+
+				return ""
+
+			case "run-done":
 				if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
 					return "no"
 
-				await write(args.join(" "))
-				keyTap("escape")
-				mouseClick("right")
-				keyToggle("enter", "down")
+				if (args[0] == oogBotCurrentID) {
+					oogBotCurrentID = null
+					keyToggle("enter", "up")
+					oogBotRunCommand()
+					return ""
+				}
+
+				return "no"
+
+			case "run-clear":
+				if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
+					return "no"
+
+				oogBotCurrentID = null
 
 				return ""
 
@@ -662,4 +712,23 @@ function renderColor(text: string) {
 
 function removeColorCodes(text: string) {
 	return text.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, "$1")
+}
+
+async function oogBotRunCommand() {
+	console.log(oogBotCommandQueue, oogBotCurrentID)
+
+	if (oogBotCommandQueue.length && !oogBotCurrentID) {
+		const { id, command } = oogBotCommandQueue.shift()!
+
+		oogBotCurrentID = id
+
+		const promise = write(command)
+
+		keyTap("escape")
+
+		await promise
+
+		mouseClick("right")
+		keyToggle("enter", "down")
+	}
 }
