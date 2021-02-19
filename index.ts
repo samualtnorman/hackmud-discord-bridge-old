@@ -4,17 +4,13 @@ import { validate, DynamicMap, asyncReplace, matches } from "./lib"
 import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
 import { mouseClick, keyTap, keyToggle } from "robotjs"
 import { write } from "clipboardy"
+import { config } from "process"
 
 type HackmudMessageListener = (messages: (HackmudChannelMessage | HackmudTellMessage)[], hackmudChatAPI: HackmudChatAPI) => void
 
 // const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
 
-const oogBotCommandQueue: {
-	id: string
-	command: string
-}[] = []
-
-let oogBotCurrentID: string | null = null
+const oogBotCommandQueue: string[] = []
 
 // setTimeout(() => {
 // 	oogBotCurrentID = null
@@ -40,7 +36,8 @@ Promise.all([
 		colors: [ "record", [ "string" ] ],
 		adverts: [ "array", [ "string" ] ],
 		mentionNotifications: [ "record", [ [ "array", [ "string" ] ] ] ],
-		plugins: [ "array", [ "string" ] ]
+		plugins: [ "array", [ "string" ] ],
+		oogBotIdleScript: "string"
 	})) {
 		console.log("invalid config")
 		return
@@ -307,8 +304,8 @@ Promise.all([
 				if (!config.hosts.length)
 					return "tell command not available"
 
-				if (config.chatbots.includes(args[0]))
-					return "I know what you're up to"
+				// if (config.chatbots.includes(args[0]))
+				// 	return "I know what you're up to"
 
 				if (author instanceof DiscordUser) {
 					if (config.ownerUsers.length && author.id == guild!.ownerID) {
@@ -439,52 +436,62 @@ Promise.all([
 				return ""
 			}
 
-			case "run":
-				if (!config.enableOOG)
-					return "oog bot disabled"
+			// case "run":
+			// 	if (!config.enableOOG)
+			// 		return "oog bot disabled"
 
-				if (author instanceof DiscordUser) {
-					if (author.id != guild!.ownerID)
-						return "no"
+			// 	if (author instanceof DiscordUser) {
+			// 		if (author.id != guild!.ownerID)
+			// 			return "no"
 
-					return "not yet"
-				} else {
-					if (![ ...usersChannels.keys() ].includes(author))
-						return "no"
+			// 		return "not yet"
+			// 	} else {
+			// 		if (![ ...usersChannels.keys() ].includes(author))
+			// 			return "no"
 
-					const [ id, script, ...scriptArgs ] = args
+			// 		const [ id, script, ...scriptArgs ] = args
 
-					let command = `swan.oog { i: "${id}", s: #s.${script}`
+			// 		let command = `swan.oog { i: "${id}", s: #s.${script}`
 
-					if (scriptArgs.length)
-						command += `, a: ${scriptArgs.join(" ")}`
+			// 		if (scriptArgs.length)
+			// 			command += `, a: ${scriptArgs.join(" ")}`
 
-					command += " }"
+			// 		command += " }"
 
-					oogBotCommandQueue.push({ id, command })
-					oogBotRunCommand()
-				}
+			// 		oogBotCommandQueue.push({ id, command })
+			// 		oogBotRunCommand()
+			// 	}
 
-				return ""
+			// 	return ""
 
-			case "run-done":
-				if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
+			// case "run-done":
+			// 	if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
+			// 		return "no"
+
+			// 	if (args[0] == oogBotCurrentID) {
+			// 		oogBotCurrentID = null
+			// 		keyToggle("enter", "up")
+			// 		oogBotRunCommand()
+			// 		return ""
+			// 	}
+
+			// 	return "no"
+
+			// case "run-clear":
+			// 	if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
+			// 		return "no"
+
+			// 	oogBotCurrentID = null
+
+			// 	return ""
+
+			case "oog":
+				if (message.type != HackmudMessageType.Tell || ![ ...usersChannels.keys() ].includes(message.user))
 					return "no"
 
-				if (args[0] == oogBotCurrentID) {
-					oogBotCurrentID = null
-					keyToggle("enter", "up")
-					oogBotRunCommand()
-					return ""
-				}
+				oogBotCommandQueue.push(...JSON.parse(args.join(" ")))
 
-				return "no"
-
-			case "run-clear":
-				if (!config.enableOOG || (author instanceof DiscordUser ? author.id != guild!.ownerID : ![ ...usersChannels.keys() ].includes(author)))
-					return "no"
-
-				oogBotCurrentID = null
+				setTimeout(oogBotRunCommand, 4000)
 
 				return ""
 
@@ -579,6 +586,19 @@ Promise.all([
 			.replaceAll("\\", "\\\\")
 			.replaceAll("[", "\\[")
 			.replaceAll("]", "\\]")
+	}
+
+	const oogBotRunCommand = async () => {
+		const [ script, ...args ] = (oogBotCommandQueue.shift() || config.oogBotIdleScript).split(" ")
+
+		const promise = write(`oog { s: #s.${script}, a: ${args.join(" ") || "null"} }`)
+
+		keyTap("escape")
+
+		await promise
+
+		mouseClick("right")
+		keyToggle("enter", "down")
 	}
 
 	const preGetChannelsMessageBuffer: DiscordMessage[] = []
@@ -725,25 +745,6 @@ function renderColor(text: string) {
 
 function removeColorCodes(text: string) {
 	return text.replace(/`[^\W_]((?:(?!`|\\n).)+)`/g, "$1")
-}
-
-async function oogBotRunCommand() {
-	console.log(oogBotCommandQueue, oogBotCurrentID)
-
-	if (oogBotCommandQueue.length && !oogBotCurrentID) {
-		const { id, command } = oogBotCommandQueue.shift()!
-
-		oogBotCurrentID = id
-
-		const promise = write(command)
-
-		keyTap("escape")
-
-		await promise
-
-		mouseClick("right")
-		keyToggle("enter", "down")
-	}
 }
 
 export function registerHackmudMessageListener(hackmudMessageListener: HackmudMessageListener) {
