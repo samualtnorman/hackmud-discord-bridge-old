@@ -141,11 +141,13 @@ Promise.all([
 	const processHackmudMessages = async (messages: (HackmudChannelMessage | HackmudTellMessage)[]) => {
 		const channelMessages = new DynamicMap<string, HackmudChannelMessage[]>(Array)
 
+		// TODO recognise messages sent by chat api and ignore them
+
 		for (const message of messages) {
 			if (message.type == HackmudMessageType.Tell) {
 				if (config.chatbots.includes(message.toUser))
-					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${(await processCommand(removeColorCodes(message.content).trim(), message) || "ok")} `)
-				else if ([ ...usersChannels.keys() ].includes(message.toUser) && !config.hosts.includes(message.user) && !config.chatbots.includes(message.user))
+					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${await processCommand(removeColorCodes(message.content).trim(), message) || "ok"} `)
+				else if (![ ...usersChannels.keys() ].includes(message.user))
 					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 			} else if (config.hosts.includes(message.user) || config.chatbots.includes(message.user) || config.ownerUsers.includes(message.user))
 				adminChannel?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
