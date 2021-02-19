@@ -1,9 +1,11 @@
-import { ChannelMessage as HackmudChannelMessage, HackmudChatAPI, MessageType as HackmudMessageType, MessageType, TellMessage as HackmudTellMessage } from "@samual/hackmud-chat-api"
+import { ChannelMessage as HackmudChannelMessage, HackmudChatAPI, MessageType as HackmudMessageType, TellMessage as HackmudTellMessage } from "@samual/hackmud-chat-api"
 import { readFile, writeFile } from "fs/promises"
 import { validate, DynamicMap, asyncReplace, matches } from "./lib"
 import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
 import { mouseClick, keyTap, keyToggle } from "robotjs"
 import { write } from "clipboardy"
+
+type HackmudMessageListener = (messages: (HackmudChannelMessage | HackmudTellMessage)[], hackmudChatAPI: HackmudChatAPI) => void
 
 // const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
 
@@ -18,6 +20,8 @@ let oogBotCurrentID: string | null = null
 // 	oogBotCurrentID = null
 // 	oogBotRunCommand()
 // }, 5000)
+
+const hackmudMessageListeners: HackmudMessageListener[] = []
 
 Promise.all([
 	readFile("./config.json", { encoding: "utf-8" }).then(JSON.parse),
@@ -35,11 +39,15 @@ Promise.all([
 		roles: [ "record", [ [ "array", [ "string" ] ] ] ],
 		colors: [ "record", [ "string" ] ],
 		adverts: [ "array", [ "string" ] ],
-		mentionNotifications: [ "record", [ [ "array", [ "string" ] ] ] ]
+		mentionNotifications: [ "record", [ [ "array", [ "string" ] ] ] ],
+		plugins: [ "array", [ "string" ] ]
 	})) {
 		console.log("invalid config")
 		return
 	}
+
+	for (const plugin of config.plugins)
+		import(plugin)
 
 	const processDiscordMessage = async (message: DiscordMessage) => {
 		if (message.author == discordAPI.user)
@@ -139,6 +147,9 @@ Promise.all([
 	}
 
 	const processHackmudMessages = async (messages: (HackmudChannelMessage | HackmudTellMessage)[]) => {
+		for (const hackmudMessageListener of hackmudMessageListeners)
+			hackmudMessageListener(messages, hackmudChatAPI)
+
 		const channelMessages = new DynamicMap<string, HackmudChannelMessage[]>(Array)
 
 		// TODO recognise messages sent by chat api and ignore them
@@ -160,21 +171,21 @@ Promise.all([
 
 			for (const message of messages) {
 				switch (message.type) {
-					case MessageType.Join:
+					case HackmudMessageType.Join:
 						toSend += `**${message.user.replaceAll("_", "\\_")}** joined channel\n`
 
 						channelsLastUser.delete(channel)
 
 						break
 
-					case MessageType.Leave:
+					case HackmudMessageType.Leave:
 						toSend += `**${message.user.replaceAll("_", "\\_")}** left channel\n`
 
 						channelsLastUser.delete(channel)
 
 						break
 
-					case MessageType.Send:
+					case HackmudMessageType.Send:
 						toSend += processHackmudMessageText(message, channelsLastUser.get(channel) != message.user)
 
 						channelsLastUser.set(channel, message.user)
@@ -733,4 +744,8 @@ async function oogBotRunCommand() {
 		mouseClick("right")
 		keyToggle("enter", "down")
 	}
+}
+
+export function registerHackmudMessageListener(hackmudMessageListener: HackmudMessageListener) {
+	hackmudMessageListeners.push(hackmudMessageListener)
 }

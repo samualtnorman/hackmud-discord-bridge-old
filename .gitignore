@@ -107,3 +107,4 @@ dist
 *.d.ts
 
 config.json
+echo.ts
