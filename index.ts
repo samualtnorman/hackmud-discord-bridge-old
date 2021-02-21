@@ -1,12 +1,11 @@
-import { ChannelMessage as HackmudChannelMessage, HackmudChatAPI, MessageType as HackmudMessageType, TellMessage as HackmudTellMessage } from "@samual/hackmud-chat-api"
+import { ChannelMessage as HackmudChannelMessage, Client as HackmudChatClient, MessageType as HackmudMessageType, TellMessage as HackmudTellMessage } from "@samual/hackmud-chat-api"
 import { readFile, writeFile } from "fs/promises"
 import { validate, DynamicMap, asyncReplace, matches } from "./lib"
 import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
 import { mouseClick, keyTap, keyToggle } from "robotjs"
 import { write } from "clipboardy"
-import { config } from "process"
 
-type HackmudMessageListener = (messages: (HackmudChannelMessage | HackmudTellMessage)[], hackmudChatAPI: HackmudChatAPI) => void
+type HackmudMessageListener = (messages: (HackmudChannelMessage | HackmudTellMessage)[], hackmudChatAPI: HackmudChatClient) => void
 
 // const hackmudValidCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"$%^&*()`-=_+[]{}'#@~,./<>?\\|¡¢Á¤Ã¦§¨©ª▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕«"
 
@@ -608,7 +607,7 @@ Promise.all([
 	let guild: Guild | null = null
 	let adminChannel: DiscordTextChannel | undefined
 
-	const hackmudChatAPI = new HackmudChatAPI(config.hackmudToken)
+	const hackmudChatAPI = new HackmudChatClient(config.hackmudToken)
 		.onStart(token => {
 			config.hackmudToken = token
 
