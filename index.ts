@@ -1,9 +1,11 @@
 import { ChannelMessage as HackmudChannelMessage, Client as HackmudChatClient, MessageType as HackmudMessageType, TellMessage as HackmudTellMessage } from "@samual/hackmud-chat-api"
-import { readFile, writeFile } from "fs/promises"
+import { promises as fsPromises } from "fs"
 import { validate, DynamicMap, asyncReplace, matches } from "./lib"
-import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
+import { Client as DiscordClient, DMChannel as DiscordDMChannel, Guild, Intents, Message as DiscordMessage, TextChannel as DiscordTextChannel, User as DiscordUser } from "discord.js"
 import { mouseClick, keyTap, keyToggle } from "robotjs"
-import { write } from "clipboardy"
+import clipboard from "clipboardy"
+
+const { readFile, writeFile } = fsPromises
 
 type HackmudMessageListener = (messages: (HackmudChannelMessage | HackmudTellMessage)[], hackmudChatAPI: HackmudChatClient) => void
 
@@ -70,7 +72,7 @@ Promise.all([
 				return
 
 			let host: string | undefined
-			let messageFromOwner = message.member == guild!.owner
+			let messageFromOwner = message.member == await guild!.fetchOwner()
 
 			if (messageFromOwner) {
 				for (const user of config.ownerUsers) {
@@ -98,7 +100,7 @@ Promise.all([
 
 			if (!host) {
 				message.react("\u274C")
-				adminChannel?.send(`<@${guild!.ownerID}> missing host in channel **${channel}**`)
+				adminChannel?.send(`<@${guild!.ownerId}> missing host in channel **${channel}**`)
 				return
 			}
 
@@ -155,7 +157,7 @@ Promise.all([
 				if (config.chatbots.includes(message.toUser))
 					hackmudChatAPI.tellMessage(message.toUser, message.user, ` ${await processCommand(removeColorCodes(message.content).trim(), message) || "ok"} `)
 				else if (![ ...usersChannels.keys() ].includes(message.user))
-					adminChannel?.send(`<@${guild!.ownerID}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
+					adminChannel?.send(`<@${guild!.ownerId}>, tell from **${message.user.replaceAll("_", "\\_")}** to **${message.toUser}**:${processHackmudMessageText(message, false)}`)
 			} else if (config.hosts.includes(message.user) || config.chatbots.includes(message.user) || config.ownerUsers.includes(message.user))
 				adminChannel?.send(`channel **${message.channel}**...\n${processHackmudMessageText(message)}`)
 			else
@@ -307,7 +309,7 @@ Promise.all([
 				// 	return "I know what you're up to"
 
 				if (author instanceof DiscordUser) {
-					if (config.ownerUsers.length && author.id == guild!.ownerID) {
+					if (config.ownerUsers.length && author.id == guild!.ownerId) {
 						return hackmudChatAPI.tellMessage(
 							config.ownerUsers[0],
 							args[0],
@@ -502,7 +504,7 @@ Promise.all([
 	const stringifyDiscordUser = (user: DiscordUser, messagePre = false, channel?: string) => {
 		let users = {
 			[discordAPI.user!.id]: config.chatbots,
-			[guild!.ownerID]: config.ownerUsers
+			[guild!.ownerId]: config.ownerUsers
 		}[user.id]
 
 		if (users) {
@@ -590,7 +592,7 @@ Promise.all([
 	const oogBotRunCommand = async () => {
 		const [ script, ...args ] = (oogBotCommandQueue.shift() || config.oogBotIdleScript).split(" ")
 
-		const promise = write(`oog { s: #s.${script}, a: ${args.join(" ") || "null"} }`)
+		const promise = clipboard.write(`oog { s: #s.${script}, a: ${args.join(" ") || "null"} }`)
 
 		keyTap("escape")
 
@@ -622,13 +624,13 @@ Promise.all([
 
 	let discordCommandRegex: RegExp | undefined
 
-	const discordAPI = new DiscordClient({ retryLimit: 4 })
+	const discordAPI = new DiscordClient({ retryLimit: 4, intents: [ Intents.FLAGS.GUILDS ] })
 		.on("ready", () => {
 			discordCommandRegex = new RegExp(`^ *<@!?${discordAPI.user!.id}>,? *(.+)`)
 
-			;[ guild ] = discordAPI.guilds.cache.array()
+			;[ guild ] = discordAPI.guilds.cache.values()
 
-			for (const channel of guild.channels.cache.array()) {
+			for (const channel of guild.channels.cache.values()) {
 				if (channel instanceof DiscordTextChannel)
 					discordChannels.set(channel.topic || channel.name, channel)
 			}
